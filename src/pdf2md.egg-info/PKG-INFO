@@ -1,0 +1,5 @@
+Metadata-Version: 2.4
+Name: pdf2md
+Version: 0.1.0
+Summary: Convert PDF to Markdown using MinerU, with optional LLM post-processing
+Requires-Python: >=3.10
