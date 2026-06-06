@@ -30,8 +30,8 @@ def detect_mineru_cli() -> str | None:
 def _find_output_md(output_dir: Path, input_stem: str) -> str | None:
     """Locate the markdown output file produced by MinerU.
 
-    MinerU v3.x: {output_dir}/{input_stem}/ *.md
-    magic-pdf:   {output_dir}/{input_stem}_md/  *.md
+    MinerU v3.x: {output_dir}/{input_stem}/ **/*.md
+    magic-pdf:   {output_dir}/{input_stem}_md/ *.md
     Also checks flat {output_dir}/*.md as last resort.
     """
     candidates = [
@@ -40,7 +40,8 @@ def _find_output_md(output_dir: Path, input_stem: str) -> str | None:
     ]
     for candidate_dir in candidates:
         if candidate_dir.is_dir():
-            md_files = sorted(candidate_dir.glob("*.md"))
+            # Recursive glob — MinerU v3.x nests output under method subdir (auto/)
+            md_files = sorted(candidate_dir.rglob("*.md"))
             if md_files:
                 return str(md_files[0])
 
