@@ -44,6 +44,7 @@ class Config:
 
     # General
     verbose: bool = False
+    timeout: int = 3600  # max seconds per PDF (CPU needs longer)
 
     # MinerU model source (for downloading models)
     model_source: str = ""  # modelscope, huggingface, local; empty = auto

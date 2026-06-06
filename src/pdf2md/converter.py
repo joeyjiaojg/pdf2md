@@ -15,10 +15,6 @@ from pdf2md.config import Config
 
 logger = logging.getLogger(__name__)
 
-# Default subprocess timeout per document (seconds)
-_DEFAULT_TIMEOUT = 600
-
-
 def detect_mineru_cli() -> str | None:
     """Check which MinerU CLI is available on the system.
 
@@ -117,12 +113,12 @@ def parse_pdf(
             args,
             capture_output=True,
             text=True,
-            timeout=_DEFAULT_TIMEOUT,
+            timeout=config.timeout,
             env=env,
         )
     except subprocess.TimeoutExpired:
         raise RuntimeError(
-            f"mineru timed out after {_DEFAULT_TIMEOUT}s on {inp.name}"
+            f"mineru timed out after {config.timeout}s on {inp.name}"
         )
 
     if result.returncode != 0:
@@ -170,8 +166,6 @@ def _build_command(cli: str, input_path: str, output_dir: str, backend: str, con
             "-m", method,
         ]
 
-    if config.verbose:
-        args.append("-d")  # debug flag if supported
     return args
 
 
