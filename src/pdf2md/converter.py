@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Callable
 
 from pdf2md.config import Config
+from pdf2md.splitter import split_pdf_by_range, get_page_range_from_pdf
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +95,36 @@ def parse_pdf(
         raise RuntimeError(f"Input file not found: {input_path}")
 
     out.mkdir(parents=True, exist_ok=True)
+
+    total_pages = 0
+    try:
+        total_pages = get_page_range_from_pdf(str(inp))
+    except RuntimeError as e:
+        if "pypdf" in str(e).lower():
+            raise
+        logger.warning("Cannot detect page count: %s, skipping auto-split", e)
+
+    if config.timeout < 7200 and total_pages > 100:
+        logger.info(
+            "Large PDF detected (%d pages), auto-splitting for timeout safety",
+            total_pages
+        )
+        split_output = output_dir
+        split_paths = list(split_pdf_by_range(str(inp), split_output, max_pages_per_file=50))
+        _emit(progress_callback, f"Split {inp.name} into {len(split_paths)} parts")
+        
+        parsed_outputs = []
+        for split_path in split_paths:
+            orig_output_dir = config.output_dir
+            config.output_dir = split_output
+            try:
+                parsed_outputs.append(parse_pdf(
+                    split_path, split_output, backend, config, progress_callback
+                ))
+            finally:
+                config.output_dir = orig_output_dir
+        
+        return merge_markdown_splits(parsed_outputs, str(inp.stem))
 
     _emit(progress_callback, f"Parsing {inp.name} using backend '{backend}'...")
 
@@ -184,6 +215,34 @@ def _emit(callback: Callable[[str], None] | None, msg: str) -> None:
     """Call the progress callback if provided."""
     if callback is not None:
         callback(msg)
+
+
+def merge_markdown_splits(md_paths: list[str], original_stem: str) -> str:
+    """Merge multiple markdown files from split PDFs back into a single file.
+
+    Concatenates all markdown files in order and writes to a single output file.
+
+    Args:
+        md_paths: List of markdown file paths from split PDFs.
+        original_stem: Original PDF stem for output filename.
+
+    Returns:
+        Path to the merged markdown file.
+    """
+    if not md_paths:
+        raise RuntimeError("No markdown files to merge")
+
+    merged_content = ""
+    for md_path in md_paths:
+        if Path(md_path).is_file():
+            merged_content += Path(md_path).read_text(encoding="utf-8")
+            merged_content += "\n"
+
+    output_path = Path(output_dir) / f"{original_stem}.md"
+    output_path.write_text(merged_content, encoding="utf-8")
+
+    logger.info("Merged %d split markdown files into %s", len(md_paths), output_path)
+    return str(output_path.resolve())
 
 
 def _process_single(args: tuple) -> str:

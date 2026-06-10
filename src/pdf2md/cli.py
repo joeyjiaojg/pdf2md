@@ -69,6 +69,12 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Number of PDFs to process in parallel (default: 1)",
     )
     parser.add_argument(
+        "--timeout",
+        type=int,
+        default=None,
+        help="Timeout in seconds per PDF (default: 3600)",
+    )
+    parser.add_argument(
         "-v", "--verbose",
         action="store_true",
         help="Enable verbose logging",
@@ -148,6 +154,8 @@ def main() -> int:
         config.backend = args.backend
     if args.batch_size:
         config.batch_size = args.batch_size
+    if args.timeout is not None:
+        config.timeout = args.timeout
     if args.verbose:
         config.verbose = True
 
