@@ -112,6 +112,20 @@ def _setup_logging(verbose: bool) -> None:
     )
 
 
+def _gpu_available() -> bool:
+    """Detect whether a CUDA-compatible GPU is available.
+
+    Returns True if torch is installed and cuda is available,
+    otherwise False.  On CPU-only systems this avoids crashing
+    on MinerU's hybrid-auto-engine backend.
+    """
+    try:
+        import torch
+        return torch.cuda.is_available()
+    except Exception:
+        return False
+
+
 def main() -> int:
     parser = _build_parser()
     args = parser.parse_args()
@@ -119,6 +133,13 @@ def main() -> int:
     # Load config (CLI args override config file values)
     config = load_config(args.config)
     _setup_logging(args.verbose or config.verbose)
+
+    # Auto-detect GPU — fall back to pipeline on CPU-only systems
+    user_explicit_backend = args.backend is not None
+    if not user_explicit_backend and not _gpu_available():
+        logger = logging.getLogger(__name__)
+        logger.info("No GPU detected — falling back to 'pipeline' backend")
+        config.backend = "pipeline"
 
     # CLI overrides
     if args.output_dir:
