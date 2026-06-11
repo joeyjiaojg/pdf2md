@@ -75,6 +75,17 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Timeout in seconds per PDF (default: 3600)",
     )
     parser.add_argument(
+        "--translate",
+        action="store_true",
+        help="Enable auto-translation to Simplified Chinese if source is not Chinese",
+    )
+    parser.add_argument(
+        "--translate-from",
+        choices=["auto", "en", "ja", "ko"],
+        default=None,
+        help="Source language for translation (default: auto-detect)",
+    )
+    parser.add_argument(
         "-v", "--verbose",
         action="store_true",
         help="Enable verbose logging",
@@ -156,6 +167,10 @@ def main() -> int:
         config.batch_size = args.batch_size
     if args.timeout is not None:
         config.timeout = args.timeout
+    if args.translate:
+        config.translate_enabled = True
+    if args.translate_from:
+        config.translate_from_lang = args.translate_from
     if args.verbose:
         config.verbose = True
 
@@ -222,6 +237,10 @@ def main() -> int:
         if config.stages_post_md:
             stages_to_run.append("full_md")
 
+        # Add translation if enabled and content is not Chinese
+        if config.translate_enabled:
+            stages_to_run.append("translate")
+
         if stages_to_run:
             for md_path_str in output_paths:
                 md_path = Path(md_path_str)
@@ -233,9 +252,22 @@ def main() -> int:
                     logging.warning("Cannot read %s: %s", md_path, exc)
                     continue
 
+                if "translate" in stages_to_run:
+                    try:
+                        from pdf2md.language import is_chinese
+                        if not is_chinese(content):
+                            logging.info("Translating %s from non-Chinese to Chinese", md_path.name)
+                            content = llm_client.post_process(content, "translate")
+                        else:
+                            logging.info("%s is already in Chinese, skipping translation", md_path.name)
+                    except Exception as e:
+                        logging.warning("Translation failed for %s: %s", md_path.name, e)
+                        logging.info("Continuing without translation...")
+
                 for stage in stages_to_run:
-                    logging.info("LLM post-processing stage '%s' on %s", stage, md_path.name)
-                    content = llm_client.post_process(content, stage)
+                    if stage != "translate":
+                        logging.info("LLM post-processing stage '%s' on %s", stage, md_path.name)
+                        content = llm_client.post_process(content, stage)
 
                 try:
                     md_path.write_text(content, encoding="utf-8")

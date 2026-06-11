@@ -42,6 +42,10 @@ class Config:
     stages_post_formula: bool = False
     stages_post_md: bool = False
 
+    # Translation settings
+    translate_enabled: bool = False
+    translate_from_lang: str = "auto"
+
     # General
     verbose: bool = False
     timeout: int = 3600  # max seconds per PDF (CPU needs longer)

@@ -55,6 +55,17 @@ _STAGE_PROMPTS: dict[str, str] = {
         "normalize list indentation, ensure code blocks have language tags where obvious. "
         "Do NOT rewrite sentences or change content meaning."
     ),
+    "translate": (
+        "Translate this markdown document from {source_lang} to Simplified Chinese (中文). "
+        "Requirements:\n"
+        "1. Translate ALL text content including headings, paragraphs, tables, lists\n"
+        "2. Keep the original markdown structure (##, ###, tables, code blocks)\n"
+        "3. Translate table headers and content to Chinese\n"
+        "4. Preserve technical terms, numbers, codes, and proper nouns\n"
+        "5. Output ONLY the translated markdown, no explanations\n\n"
+        "---\n"
+        "{content}"
+    ),
 }
 
 
@@ -80,7 +91,7 @@ class LLMClient:
 
         Args:
             markdown: The markdown content to process.
-            stage: One of "table", "formula", "heading", "full_md".
+            stage: One of "table", "formula", "heading", "full_md", "translate".
 
         Returns:
             Processed markdown, or original markdown unchanged on failure.
@@ -92,6 +103,12 @@ class LLMClient:
 
         if not markdown.strip():
             return markdown
+
+        if stage == "translate":
+            result = self._translate_to_chinese(markdown)
+            if result is None:
+                return markdown
+            return result
 
         messages = [
             {
@@ -105,6 +122,31 @@ class LLMClient:
         if result is None:
             return markdown
 
+        return result
+
+    def _translate_to_chinese(self, markdown: str) -> str | None:
+        source_lang = getattr(self.config, "translate_from_lang", "auto")
+        
+        if source_lang == "auto":
+            try:
+                from pdf2md.language import detect_language
+                source_lang = detect_language(markdown)
+                logger.info("Auto-detected source language: %s", source_lang)
+            except Exception as e:
+                logger.warning("Failed to auto-detect language: %s, using English", e)
+                source_lang = "en"
+
+        prompt = _STAGE_PROMPTS["translate"].format(source_lang=source_lang, content=markdown)
+
+        messages = [
+            {
+                "role": "system",
+                "content": "You are a professional Chinese translator. Translate the following markdown to Simplified Chinese while preserving structure.",
+            },
+            {"role": "user", "content": prompt},
+        ]
+
+        result = self._call(messages)
         return result
 
     def _call(self, messages: list[dict[str, str]]) -> str | None:

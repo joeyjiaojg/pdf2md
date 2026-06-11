@@ -62,24 +62,24 @@ def split_pdf_by_pages(
                 if not page_range:
                     continue
 
-                start_page = min(page_range) - 1
-                end_page = max(page_range)
+                start_page = min(page_range) - 1  # Convert 1-based to 0-based
+                end_page = max(page_range) - 1    # Convert 1-based to 0-based
 
                 if start_page < 0 or end_page >= total_pages or start_page > end_page:
                     logger.warning("Invalid page range %s for %d-page PDF", page_range, total_pages)
                     continue
 
-                output_path = output_dir / f"{stem}_p{start_page+1}-{end_page}.pdf"
+                output_path = output_dir / f"{stem}_p{start_page+1}-{end_page+1}.pdf"
 
                 writer = PdfWriter()
-                for i in range(start_page, end_page):
+                for i in range(start_page, end_page + 1):
                     writer.add_page(reader.pages[i])
 
                 with open(output_path, "wb") as f:
                     writer.write(f)
 
                 split_paths.append(str(output_path.resolve()))
-                logger.info("Split: %s → %s (pages %s-%s)", input_path.name, output_path.name, start_page+1, end_page)
+                logger.info("Split: %s → %s (pages %d-%d)", input_path.name, output_path.name, start_page+1, end_page+1)
 
         else:
             raise RuntimeError("PDF splitting requires pypdf. Install with: pip install pypdf")
@@ -139,6 +139,9 @@ def split_pdf_by_range(
     while start <= total_pages:
         end = min(start + max_pages_per_file - 1, total_pages)
         page_range = list(range(start, end + 1))
+        
+        if not page_range:
+            break
 
         # Split this chunk
         split_paths = split_pdf_by_pages(input_path, output_dir, [page_range], f"{stem}_part")
